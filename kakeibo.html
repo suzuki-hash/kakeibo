@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>家計簿</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:        #F2F4F8;
+  --surface:   #FFFFFF;
+  --surface2:  #F6F7FB;
+  --line:      rgba(0,0,0,0.07);
+  --accent:    #4D5FE8;
+  --accent-bg: rgba(77,95,232,0.08);
+  --gold:      #D4971A;
+  --gold-bg:   rgba(212,151,26,0.10);
+  --text:      #0D1226;
+  --muted:     #8892B0;
+  --success:   #0BAB64;
+  --danger:    #E0364A;
+  --warn:      #D4971A;
+  --food:      #0BAB64;
+  --luxury:    #D4971A;
+  --goods:     #4D5FE8;
+  --transport: #7C5FD4;
+  --leisure:   #E0364A;
+  --hobby:     #E07828;
+  --other:     #8892B0;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-tap-highlight-color: transparent; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+  background: var(--bg); color: var(--text);
+  max-width: 430px; margin: 0 auto; min-height: 100vh; overflow-x: hidden;
+}
+button { cursor: pointer; }
+input, select, button, textarea { font-family: inherit; }
+
+.screen { display: none; min-height: 100vh; padding-bottom: 88px; }
+.screen.active { display: block; }
+
+/* ── Header ── */
+.ph { padding: 56px 20px 20px; border-bottom: 1px solid var(--line); }
+.ph-title { font-size: 22px; font-weight: 700; letter-spacing: -.3px; }
+.ph-sub   { font-size: 13px; color: var(--muted); margin-top: 3px; }
+
+/* ── Budget hero ── */
+.budget-hero {
+  padding: 52px 20px 22px; border-bottom: none;
+  background: #0B1628;
+  color: #fff; position: relative;
+}
+.hero-label  { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(255,255,255,.5); }
+.hero-amount { font-size: 40px; font-weight: 800; letter-spacing: -0.03em; margin: 6px 0 18px; font-variant-numeric: tabular-nums; }
+.hero-amount span { font-size: 20px; font-weight: 500; color: rgba(255,255,255,.6); margin-right: 2px; }
+.track-bg   { height: 3px; background: rgba(255,255,255,.15); border-radius: 99px; }
+.track-fill { height: 3px; border-radius: 99px; background: var(--accent); transition: width .7s ease; }
+.hero-foot  { display: flex; justify-content: space-between; font-size: 11px; color: rgba(255,255,255,.6); margin-top: 8px; }
+.hero-foot strong { color: rgba(255,255,255,.9); font-variant-numeric: tabular-nums; }
+
+/* ── Bell button ── */
+.bell-btn {
+  position: absolute; top: 14px; right: 14px;
+  width: 36px; height: 36px; border-radius: 6px;
+  background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.12); color: rgba(255,255,255,.7);
+  display: flex; align-items: center; justify-content: center;
+  transition: background .15s;
+}
+.bell-btn:active { background: rgba(255,255,255,.2); }
+.bell-wrap { position: relative; display: inline-flex; }
+.bell-badge {
+  position: absolute; top: -3px; right: -3px;
+  width: 8px; height: 8px; background: var(--danger);
+  border-radius: 50%; border: 1.5px solid #0B1628;
+  display: none;
+}
+.bell-badge.show { display: block; }
+
+/* ── Stats ── */
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px 14px; }
+.stat {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 8px; padding: 12px 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.05);
+}
+.stat-label { font-size: 10px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
+.stat-val   { font-size: 20px; font-weight: 800; margin-top: 5px; font-variant-numeric: tabular-nums; }
+.danger  { color: var(--danger); }
+.success { color: var(--success); }
+
+/* ── Cards ── */
+.card {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 8px; padding: 16px; margin: 0 14px 10px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.05);
+}
+.card-title { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
+.chart-wrap { height: 196px; position: relative; }
+
+/* ── Transaction list ── */
+.tx { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line); }
+.tx:last-child { border-bottom: none; }
+.tx-ico  { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+.tx-body { flex: 1; min-width: 0; }
+.tx-store{ font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+.tx-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.tx-right{ text-align: right; flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.tx-amt  { font-size: 14px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.tx-date { font-size: 11px; color: var(--muted); }
+.tx-actions { display: flex; gap: 4px; }
+.tx-edit-btn {
+  font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 4px; border: 1px solid var(--line);
+  background: var(--surface2); color: var(--text2, var(--muted)); line-height: 1.4; letter-spacing: .03em;
+}
+.tx-del-btn {
+  font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(224,54,74,.15);
+  background: rgba(224,54,74,.06); color: var(--danger); line-height: 1.4;
+}
+
+/* ── Bottom nav ── */
+.nav {
+  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: 100%; max-width: 430px;
+  background: #fff; border-top: 1px solid var(--line); display: flex; z-index: 100;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.nav-btn {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  padding: 9px 0 7px; font-size: 10px; font-weight: 600; letter-spacing: .04em;
+  color: var(--muted); border: none; background: none; transition: color .18s; gap: 3px;
+}
+.nav-btn.active { color: var(--accent); }
+.nav-ico { width: 20px; height: 20px; stroke-width: 1.6; }
+
+/* ── FAB ── */
+.fab {
+  position: fixed; bottom: 76px; right: calc(50% - 215px + 16px);
+  width: 52px; height: 52px; background: var(--accent); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; box-shadow: 0 4px 20px rgba(77,95,232,.45);
+  border: none; z-index: 99; transition: transform .12s, box-shadow .12s;
+}
+.fab:active { transform: scale(.92); }
+
+/* ── Camera ── */
+#screen-camera { padding-bottom: 0; background: #000; }
+.cam-video { width: 100%; height: 62vh; object-fit: cover; display: block; background: #111; }
+.cam-bar { background: #000; padding: 28px 28px 40px; display: flex; align-items: center; justify-content: space-around; }
+.shutter { width: 68px; height: 68px; border-radius: 50%; border: 3px solid rgba(255,255,255,.6); background: rgba(255,255,255,.9); flex-shrink: 0; transition: transform .1s; }
+.shutter:active { transform: scale(.88); }
+.cam-aux { width: 46px; height: 46px; border-radius: 50%; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.15); color: #fff; font-size: 20px; display: flex; align-items: center; justify-content: center; }
+.cam-close { position: absolute; top: 52px; left: 16px; background: rgba(0,0,0,.55); color: #fff; border: none; border-radius: 50%; width: 38px; height: 38px; font-size: 18px; display: flex; align-items: center; justify-content: center; }
+.cam-api-notice { position: absolute; top: 52px; right: 16px; background: rgba(0,0,0,.6); color: #fff; font-size: 11px; padding: 5px 10px; border-radius: 20px; }
+
+/* ── Analyze ── */
+.analyze-body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; min-height: 64vh; padding: 40px 24px; }
+.preview-img  { width: 80%; max-height: 210px; object-fit: contain; border-radius: 14px; border: 1px solid var(--line); box-shadow: 0 8px 32px rgba(0,0,0,.12); }
+.spinner { width: 52px; height: 52px; border: 3px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.analyze-msg { font-size: 14px; color: var(--muted); text-align: center; line-height: 1.6; }
+
+/* ── Confirm items ── */
+.item-row { display: flex; align-items: flex-start; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.item-row:last-child { border-bottom: none; }
+.item-left  { flex: 1; display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.item-right { display: flex; flex-direction: column; align-items: flex-end; gap: 7px; }
+.fi { width: 100%; padding: 9px 12px; background: var(--surface2); border: 1px solid var(--line); border-radius: 10px; font-size: 14px; color: var(--text); outline: none; transition: border-color .18s; }
+.fi:focus { border-color: var(--accent); }
+select.fi { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238B95C2'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 28px; -webkit-appearance: none; background-color: var(--surface2); }
+option { background: #fff; }
+.amt-fi { width: 84px; padding: 9px 10px; background: var(--surface2); border: 1px solid var(--line); border-radius: 10px; font-size: 14px; color: var(--text); text-align: right; outline: none; transition: border-color .18s; }
+.amt-fi:focus { border-color: var(--accent); }
+.del-btn { color: var(--danger); font-size: 18px; background: none; border: none; line-height: 1; padding: 4px; }
+
+/* ── Forms ── */
+.fg { margin-bottom: 16px; }
+.fl { display: block; font-size: 11px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: var(--muted); margin-bottom: 7px; }
+.finput { width: 100%; padding: 13px 15px; background: var(--surface2); border: 1px solid var(--line); border-radius: 12px; font-size: 15px; color: var(--text); outline: none; -webkit-appearance: none; transition: border-color .18s; }
+.finput:focus { border-color: var(--accent); }
+.finput::placeholder { color: var(--muted); }
+select.finput { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238B95C2'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px; background-color: var(--surface2); }
+textarea.finput { resize: vertical; min-height: 80px; line-height: 1.6; }
+
+/* ── Buttons ── */
+.btn { width: 100%; padding: 13px; border-radius: 8px; font-size: 14px; font-weight: 700; border: none; transition: transform .12s, opacity .12s; }
+.btn:active { transform: scale(.97); opacity: .9; }
+.btn-accent  { background: var(--accent); color: #fff; }
+.btn-success { background: var(--success); color: #fff; }
+.btn-ghost   { background: var(--surface2); color: var(--text); border: 1px solid var(--line); }
+.btn-danger  { background: rgba(224,54,74,.08); color: var(--danger); border: 1px solid rgba(224,54,74,.18); }
+.btn-gold    { background: var(--gold-bg); color: var(--gold); border: 1px solid rgba(212,151,26,.2); }
+
+/* ── Price comparison ── */
+.price-product { padding: 16px 0; border-bottom: 1px solid var(--line); }
+.price-product:last-child { border-bottom: none; }
+.price-name { font-size: 15px; font-weight: 600; margin-bottom: 10px; }
+.price-rows { display: flex; flex-direction: column; gap: 6px; }
+.price-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-radius: 10px; font-size: 14px; background: var(--surface2); border: 1px solid var(--line); }
+.price-row.best { background: rgba(34,182,122,.07); border-color: rgba(34,182,122,.25); }
+.price-store { color: var(--muted); font-size: 13px; }
+.price-row.best .price-store { color: var(--success); font-weight: 600; }
+.price-amt { font-weight: 700; font-variant-numeric: tabular-nums; }
+.price-row.best .price-amt { color: var(--success); }
+.coupon-tag { margin-top: 8px; padding: 7px 12px; background: var(--gold-bg); border: 1px solid rgba(212,151,26,.2); border-radius: 8px; font-size: 12px; color: var(--gold); }
+
+/* ── Coupon card ── */
+.coupon { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 8px; padding: 12px 14px; margin-bottom: 8px; display: flex; align-items: flex-start; gap: 12px; }
+.coupon-icon  { display: none; }
+.coupon-body  { flex: 1; min-width: 0; }
+.coupon-store { font-size: 14px; font-weight: 700; }
+.coupon-note  { font-size: 12px; color: var(--muted); margin: 3px 0 0; line-height: 1.5; }
+.coupon-exp   { font-size: 11px; color: var(--danger); margin-top: 4px; }
+.coupon-badge { background: var(--accent); color: #fff; border-radius: 4px; padding: 5px 10px; font-size: 12px; font-weight: 700; white-space: nowrap; align-self: flex-start; font-variant-numeric: tabular-nums; }
+
+/* ── Search ── */
+.search-wrap { margin: 14px 16px; display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 16px; }
+.search-ico  { color: var(--muted); font-size: 16px; }
+.search-inp  { flex: 1; background: none; border: none; outline: none; font-size: 15px; color: var(--text); }
+.search-inp::placeholder { color: var(--muted); }
+
+/* ── Section title ── */
+.sec-title { font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); padding: 18px 16px 8px; }
+
+/* ── Empty state ── */
+.empty { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 40px 20px; color: var(--muted); }
+.empty-ico { font-size: 44px; opacity: .6; }
+.empty p   { font-size: 14px; text-align: center; line-height: 1.7; }
+
+/* ── Toast ── */
+.toast { position: fixed; bottom: 96px; left: 50%; transform: translateX(-50%); background: rgba(26,32,64,.92); backdrop-filter: blur(12px); color: #fff; border: 1px solid rgba(129,140,248,.3); padding: 12px 22px; border-radius: 24px; font-size: 14px; z-index: 400; white-space: nowrap; pointer-events: none; animation: toastIn 2.6s forwards; }
+@keyframes toastIn { 0%{opacity:0;transform:translateX(-50%) translateY(6px);}12%{opacity:1;transform:translateX(-50%) translateY(0);}78%{opacity:1;}100%{opacity:0;} }
+
+/* ── Modal ── */
+.modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 200; align-items: flex-end; justify-content: center; }
+.modal-bg.open { display: flex; }
+.modal-sheet { background: #fff; border-radius: 14px 14px 0 0; border-top: 1px solid var(--line); width: 100%; max-width: 430px; padding: 16px 18px calc(24px + env(safe-area-inset-bottom,0)); max-height: 92vh; overflow-y: auto; }
+.modal-handle { width: 32px; height: 3px; background: var(--line); border-radius: 99px; margin: 0 auto 18px; }
+.modal-title  { font-size: 16px; font-weight: 700; margin-bottom: 18px; }
+
+/* ── Notification items ── */
+.notif-item { padding: 16px 0; border-bottom: 1px solid var(--line); }
+.notif-item:last-child { border-bottom: none; }
+.notif-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.notif-dot  { width: 8px; height: 8px; border-radius: 50%; background: #FF4560; flex-shrink: 0; }
+.notif-dot.read { background: transparent; }
+.notif-title { font-size: 15px; font-weight: 700; }
+.notif-date  { font-size: 11px; color: var(--muted); margin-left: auto; }
+.notif-body  { font-size: 13px; color: var(--muted); line-height: 1.65; padding-left: 16px; }
+
+/* ── Info box ── */
+.info-box { background: var(--accent-bg); border: 1px solid rgba(129,140,248,.2); border-radius: 12px; padding: 12px 14px; margin-bottom: 16px; font-size: 13px; line-height: 1.6; }
+.info-box a { color: var(--accent); }
+
+/* ── OCR area ── */
+.ocr-btn-area { background: var(--surface2); border: 2px dashed var(--line); border-radius: 14px; padding: 18px; text-align: center; margin-bottom: 20px; cursor: pointer; transition: border-color .2s; }
+.ocr-btn-area:active { border-color: var(--accent); }
+.ocr-btn-area .ocr-icon { font-size: 28px; margin-bottom: 6px; }
+.ocr-btn-area p { font-size: 13px; color: var(--muted); line-height: 1.5; }
+.ocr-btn-area strong { color: var(--accent); }
+
+.inline-loading { display: flex; align-items: center; gap: 10px; padding: 14px; background: var(--surface2); border-radius: 12px; margin-bottom: 16px; font-size: 13px; color: var(--muted); }
+.mini-spinner { width: 20px; height: 20px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<!-- ═══ HOME ═══ -->
+<div id="screen-home" class="screen active">
+  <div class="budget-hero">
+    <div class="hero-label">今月の支出</div>
+    <div class="hero-amount"><span>¥</span><span id="h-spent-n">0</span></div>
+    <div class="track-bg"><div class="track-fill" id="h-bar" style="width:0%"></div></div>
+    <div class="hero-foot">
+      <span>残り <strong id="h-remain">¥100,000</strong></span>
+      <span id="h-pct">0% 使用</span>
+    </div>
+    <!-- Bell -->
+    <button class="bell-btn" onclick="openNotifModal()">
+      <div class="bell-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="18" height="18"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <div class="bell-badge" id="bell-badge"></div>
+      </div>
+    </button>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-label">今日の支出</div><div class="stat-val danger" id="h-today">¥0</div></div>
+    <div class="stat"><div class="stat-label">残り日割り</div><div class="stat-val success" id="h-daily">—</div></div>
+  </div>
+  <div class="card"><div class="card-title">カテゴリ別</div><div class="chart-wrap"><canvas id="cat-chart"></canvas></div></div>
+  <div class="card"><div class="card-title">直近 7 日間</div><div class="chart-wrap"><canvas id="bar-chart"></canvas></div></div>
+  <div class="sec-title">最近の記録</div>
+  <div class="card" id="tx-list"></div>
+</div>
+
+<!-- ═══ PRICES ═══ -->
+<div id="screen-prices" class="screen">
+  <div class="ph"><div class="ph-title">価格比較</div><div class="ph-sub">蓄積レシートから最安値をチェック</div></div>
+  <div class="search-wrap">
+    <span class="search-ico">⌕</span>
+    <input type="text" class="search-inp" id="price-q" placeholder="商品名で絞り込み…" oninput="renderPrices()">
+  </div>
+  <div style="margin:0 16px;" id="price-list"></div>
+</div>
+
+<!-- ═══ COUPONS ═══ -->
+<div id="screen-coupons" class="screen">
+  <div class="ph"><div class="ph-title">クーポン</div><div class="ph-sub">価格比較画面にも自動で表示</div></div>
+  <div style="margin:14px 16px;" id="coupon-list"></div>
+  <div style="margin:0 16px;"><button class="btn btn-accent" onclick="openCouponModal()">＋ クーポンを追加</button></div>
+</div>
+
+<!-- ═══ SETTINGS ═══ -->
+<div id="screen-settings" class="screen">
+  <div class="ph"><div class="ph-title">設定</div></div>
+  <div class="sec-title">月間予算</div>
+  <div class="card">
+    <div class="fg"><label class="fl">月の合計予算（円）</label><input type="number" class="finput" id="s-budget" placeholder="100000"></div>
+    <div class="fg"><label class="fl">食費の目安</label><input type="number" class="finput" id="s-food" placeholder="30000"></div>
+    <div class="fg" style="margin-bottom:0;"><label class="fl">生活用品の目安</label><input type="number" class="finput" id="s-goods" placeholder="15000"></div>
+  </div>
+  <div style="margin:0 16px 12px;"><button class="btn btn-accent" onclick="saveSettings()">保存する</button></div>
+  <div class="sec-title">AI レシート読み取り</div>
+  <div class="card">
+    <div class="info-box">
+      Gemini（無料）または Claude どちらのAPIキーも使えます。<br>
+      キーの先頭が <strong>AIza</strong> → Gemini、<strong>sk-ant</strong> → Claude として自動判別します。<br>
+      <a href="https://aistudio.google.com/app/apikey" target="_blank">→ Gemini APIキーを取得（無料）</a>
+    </div>
+    <div class="fg"><label class="fl">API キー</label><input type="password" class="finput" id="s-apikey" placeholder="AIza… または sk-ant-…" autocomplete="off"></div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.6;">キーはこのデバイスにのみ保存されます。</div>
+    <button class="btn btn-accent" onclick="saveApiKey()">API キーを保存</button>
+  </div>
+  <div class="sec-title">データ管理</div>
+  <div class="card" style="display:flex;flex-direction:column;gap:10px;">
+    <button class="btn btn-gold" onclick="exportData()">JSON でエクスポート</button>
+    <button class="btn btn-danger" onclick="clearAll()">全データを削除</button>
+  </div>
+  <div style="height:16px;"></div>
+</div>
+
+<!-- ═══ CAMERA ═══ -->
+<div id="screen-camera" class="screen">
+  <div style="position:relative;">
+    <video id="cam-v" class="cam-video" playsinline autoplay muted></video>
+    <canvas id="cam-c" style="display:none;"></canvas>
+    <button class="cam-close" onclick="closeCamera()">✕</button>
+    <div class="cam-api-notice" id="api-notice"></div>
+  </div>
+  <div class="cam-bar">
+    <button class="cam-aux" onclick="pickGallery()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="20" height="20"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+    </button>
+    <button class="shutter" onclick="snap()"></button>
+    <button class="cam-aux" onclick="openManual()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="20" height="20"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+    </button>
+  </div>
+  <input type="file" id="gallery" accept="image/*" style="display:none;" onchange="onGallery(event)">
+</div>
+
+<!-- ═══ ANALYZE ═══ -->
+<div id="screen-analyze" class="screen" style="padding-bottom:0;">
+  <div class="ph"><div class="ph-title" id="analyze-title">解析中…</div></div>
+  <div class="analyze-body">
+    <img id="analyze-img" class="preview-img" src="" alt="">
+    <div class="spinner"></div>
+    <div class="analyze-msg" id="analyze-msg">AI がレシートを読み取っています…</div>
+  </div>
+</div>
+
+<!-- ═══ CONFIRM ═══ -->
+<div id="screen-confirm" class="screen">
+  <div class="ph"><div class="ph-title" id="cf-title">内容を確認</div><div class="ph-sub">タップして修正できます</div></div>
+  <div class="card" style="margin-top:14px;">
+    <div class="fg"><label class="fl">お店名</label><input type="text" class="finput" id="cf-store" placeholder="例：イオン"></div>
+    <div class="fg" style="margin-bottom:0;"><label class="fl">日付</label><input type="date" class="finput" id="cf-date"></div>
+  </div>
+  <div class="sec-title">品目一覧</div>
+  <div class="card" id="items-list"></div>
+  <div style="margin:0 16px 10px;"><button class="btn btn-ghost" onclick="addItem()">＋ 品目を追加</button></div>
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-size:14px;font-weight:600;color:var(--muted);">合計金額</span>
+      <span style="font-size:26px;font-weight:800;color:var(--danger);font-variant-numeric:tabular-nums;" id="cf-total">¥0</span>
+    </div>
+  </div>
+  <div style="margin:0 16px 24px;display:flex;flex-direction:column;gap:10px;">
+    <button class="btn btn-success" id="cf-save-btn" onclick="saveTx()">保存する</button>
+    <button class="btn btn-ghost" onclick="cancelConfirm()">キャンセル</button>
+  </div>
+</div>
+
+<!-- ═══ NAV + FAB ═══ -->
+<nav class="nav" id="nav">
+  <button class="nav-btn active" id="nav-home" onclick="navigate('home')">
+    <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    <span>ホーム</span>
+  </button>
+  <button class="nav-btn" id="nav-prices" onclick="navigate('prices')">
+    <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+    <span>価格比較</span>
+  </button>
+  <div style="flex:.6;"></div>
+  <button class="nav-btn" id="nav-coupons" onclick="navigate('coupons')">
+    <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+    <span>クーポン</span>
+  </button>
+  <button class="nav-btn" id="nav-settings" onclick="navigate('settings')">
+    <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    <span>設定</span>
+  </button>
+</nav>
+<button class="fab" id="fab" onclick="openCamera()">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+</button>
+
+<!-- ═══ NOTIFICATION MODAL ═══ -->
+<div class="modal-bg" id="notif-modal" onclick="if(event.target===this)closeNotifModal()">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">お知らせ</div>
+    <div id="notif-list"></div>
+  </div>
+</div>
+
+<!-- ═══ COUPON MODAL ═══ -->
+<div class="modal-bg" id="coup-modal" onclick="if(event.target===this)closeCouponModal()">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">クーポンを追加</div>
+    <div class="ocr-btn-area" onclick="document.getElementById('coupon-img-input').click()">
+      <div class="ocr-icon" style="display:flex;justify-content:center;margin-bottom:6px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" width="28" height="28" style="color:var(--accent)"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></div>
+      <p><strong>チラシ・スクショを読み取る</strong><br>タップして画像を選択</p>
+    </div>
+    <input type="file" id="coupon-img-input" accept="image/*" style="display:none;" onchange="onCouponImage(event)">
+    <div id="coupon-loading" style="display:none;">
+      <div class="inline-loading"><div class="mini-spinner"></div>クーポン情報を読み取っています…</div>
+    </div>
+    <div class="fg"><label class="fl">お店名 *</label><input type="text" class="finput" id="cm-store" placeholder="イオン、マツキヨ など"></div>
+    <div class="fg"><label class="fl">割引内容 *</label><input type="text" class="finput" id="cm-disc" placeholder="10%OFF、¥500引 など"></div>
+    <div class="fg"><label class="fl">有効期限（任意）</label><input type="date" class="finput" id="cm-exp"></div>
+    <div class="fg"><label class="fl">備考（任意）</label><textarea class="finput" id="cm-note" placeholder="対象商品、利用条件など"></textarea></div>
+    <button class="btn btn-accent" onclick="saveCoupon()">追加する</button>
+  </div>
+</div>
+
+<!-- ═══ MANUAL MODAL ═══ -->
+<div class="modal-bg" id="manual-modal" onclick="if(event.target===this)closeManualModal()">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">手動入力</div>
+    <div class="fg"><label class="fl">お店名</label><input type="text" class="finput" id="mm-store" placeholder="例：セブンイレブン"></div>
+    <button class="btn btn-accent" onclick="startManual()">次へ（品目を入力）</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// ▼▼▼ APIキーをここに書くと設定不要になります ▼▼▼
+const DEFAULT_API_KEY = 'AQ.Ab8RN6J7MzFxfQBx8b0kIDKdjKTMtln7WgE0Hk_3mAeLOVlysw';
+// ▲▲▲ 例: const DEFAULT_API_KEY = 'sk-ant-api03-xxxxx...'; ▲▲▲
+// ═══════════════════════════════════════════════
+
+// ─── お知らせデータ（ここに追加していく）───
+const ANNOUNCEMENTS = [
+  {
+    id: 3,
+    date: '2026-05-25',
+    title: 'クーポン OCR 機能を追加',
+    body: 'チラシ・スクリーンショットを撮影するだけで、お店名・割引内容・有効期限を自動で読み取れるようになりました。クーポン追加画面の 📸 ボタンからお試しください。'
+  },
+  {
+    id: 2,
+    date: '2026-05-22',
+    title: '記録の編集・削除に対応',
+    body: '一度保存した記録をあとから編集・削除できるようになりました。ホーム画面の記録一覧から「編集」または「削除」ボタンをタップしてください。'
+  },
+  {
+    id: 1,
+    date: '2026-05-15',
+    title: '家計簿アプリをリリース',
+    body: 'レシートを撮るだけで自動分類できる家計簿アプリをリリースしました。Claude AI と連携することで高精度な OCR 読み取りが可能です。価格比較・クーポン管理も搭載しています。'
+  }
+];
+
+// ─── DATA ───
+const STORAGE_KEY = 'kakeibo_v3';
+let D = { transactions: [], coupons: [], settings: { budget: 100000 }, apiKey: '', readNotifIds: [] };
+
+function load() { try { const s=localStorage.getItem(STORAGE_KEY); if(s) D={...D,...JSON.parse(s)}; } catch(e){} }
+function save() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(D)); } catch(e){} }
+function getApiKey() { return D.apiKey || DEFAULT_API_KEY; }
+
+// ─── CATEGORIES ───
+const CATS = {
+  food:      {n:'食費',       e:'',hex:'#0BAB64'},
+  luxury:    {n:'贅沢な食費', e:'',hex:'#D4971A'},
+  goods:     {n:'生活用品',   e:'',hex:'#4D5FE8'},
+  transport: {n:'交通費',     e:'',hex:'#7C5FD4'},
+  leisure:   {n:'レジャー',   e:'',hex:'#E0364A'},
+  hobby:     {n:'趣味',       e:'',hex:'#E07828'},
+  other:     {n:'その他',     e:'',hex:'#8892B0'},
+};
+function catOpts(sel='food') {
+  return Object.entries(CATS).map(([k,v])=>`<option value="${k}"${k===sel?' selected':''}>${v.n}</option>`).join('');
+}
+function guessCat(name) {
+  const n=name.toLowerCase();
+  if(/弁当|おにぎり|パン|肉|野菜|果物|牛乳|卵|魚|豆腐|味噌|醤油|ジュース|お茶|コーヒー|飲料|米|麺|缶詰|冷凍|惣菜|サラダ/.test(n)) return 'food';
+  if(/お菓子|スイーツ|ケーキ|チョコ|アイス|ポテチ|スナック|外食|カフェ/.test(n)) return 'luxury';
+  if(/洗剤|シャンプー|掃除|ティッシュ|トイレ|電池|文具|歯ブラシ|化粧|ボディ|薬|サプリ|絆創膏/.test(n)) return 'goods';
+  if(/電車|バス|タクシー|駐車|交通|定期|切符|ガソリン/.test(n)) return 'transport';
+  if(/映画|旅行|レジャー|遊園地|観光|ホテル|温泉/.test(n)) return 'leisure';
+  if(/本|書籍|ゲーム|音楽|趣味|漫画|週刊/.test(n)) return 'hobby';
+  return 'other';
+}
+
+// ─── NAVIGATION ───
+const HIDE_NAV = ['camera','analyze','confirm'];
+function navigate(scr) {
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+scr).classList.add('active');
+  const hide=HIDE_NAV.includes(scr);
+  document.getElementById('nav').style.display=hide?'none':'flex';
+  document.getElementById('fab').style.display=hide?'none':'flex';
+  ['home','prices','coupons','settings'].forEach(id=>{
+    document.getElementById('nav-'+id)?.classList.toggle('active', id===scr);
+  });
+  if(scr==='home')     renderHome();
+  if(scr==='prices')   renderPrices();
+  if(scr==='coupons')  renderCoupons();
+  if(scr==='settings') renderSettings();
+}
+
+// ─── NOTIFICATIONS ───
+function hasUnread() {
+  return ANNOUNCEMENTS.some(a=>!D.readNotifIds.includes(a.id));
+}
+function updateBellBadge() {
+  document.getElementById('bell-badge').classList.toggle('show', hasUnread());
+}
+function openNotifModal() {
+  const list=document.getElementById('notif-list');
+  list.innerHTML=ANNOUNCEMENTS.map(a=>{
+    const isRead=D.readNotifIds.includes(a.id);
+    return `<div class="notif-item">
+      <div class="notif-head">
+        <div class="notif-dot${isRead?' read':''}"></div>
+        <div class="notif-title">${a.title}</div>
+        <div class="notif-date">${a.date}</div>
+      </div>
+      <div class="notif-body">${a.body}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('notif-modal').classList.add('open');
+  // すべて既読にする
+  ANNOUNCEMENTS.forEach(a=>{
+    if(!D.readNotifIds.includes(a.id)) D.readNotifIds.push(a.id);
+  });
+  save();
+  updateBellBadge();
+}
+function closeNotifModal() { document.getElementById('notif-modal').classList.remove('open'); }
+
+// ─── HOME ───
+let catC=null, barC=null;
+function monthTxs() {
+  const n=new Date();
+  return D.transactions.filter(t=>{const d=new Date(t.date);return d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear();});
+}
+function renderHome() {
+  const txs=monthTxs(), spent=txs.reduce((s,t)=>s+t.total,0);
+  const bgt=D.settings.budget||100000, rem=bgt-spent, pct=Math.min(100,Math.round((spent/bgt)*100));
+  document.getElementById('h-spent-n').textContent=spent.toLocaleString();
+  document.getElementById('h-remain').textContent='¥'+Math.max(0,rem).toLocaleString();
+  document.getElementById('h-pct').textContent=pct+'% 使用';
+  const bar=document.getElementById('h-bar');
+  bar.style.width=pct+'%';
+  bar.style.background=pct>90?'rgba(255,100,100,.9)':pct>70?'rgba(255,220,100,.9)':'#fff';
+  const today=new Date().toISOString().slice(0,10);
+  document.getElementById('h-today').textContent='¥'+txs.filter(t=>t.date===today).reduce((s,t)=>s+t.total,0).toLocaleString();
+  const daysLeft=new Date(new Date().getFullYear(),new Date().getMonth()+1,0).getDate()-new Date().getDate()+1;
+  document.getElementById('h-daily').textContent=daysLeft>0?'¥'+Math.max(0,Math.round(rem/daysLeft)).toLocaleString():'—';
+
+  // Category chart
+  const catTotals={};
+  Object.keys(CATS).forEach(k=>catTotals[k]=0);
+  txs.forEach(t=>t.items.forEach(i=>{catTotals[i.cat]=(catTotals[i.cat]||0)+i.amt;}));
+  const active=Object.entries(catTotals).filter(([,v])=>v>0);
+  if(catC){catC.destroy();catC=null;}
+  const ctx1=document.getElementById('cat-chart').getContext('2d');
+  if(active.length){
+    Chart.defaults.color='#8B95C2';
+    catC=new Chart(ctx1,{
+      type:'doughnut',
+      data:{labels:active.map(([k])=>CATS[k].e+' '+CATS[k].n),datasets:[{data:active.map(([,v])=>v),backgroundColor:active.map(([k])=>CATS[k].hex),borderWidth:2,borderColor:'#fff'}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:'#8B95C2',font:{size:11},padding:12,boxWidth:10}}}}
+    });
+  } else {
+    ctx1.clearRect(0,0,ctx1.canvas.width,ctx1.canvas.height);
+    ctx1.fillStyle='#EDEEFF';ctx1.fillRect(0,0,ctx1.canvas.width,ctx1.canvas.height);
+    ctx1.fillStyle='#8B95C2';ctx1.font='13px sans-serif';ctx1.textAlign='center';
+    ctx1.fillText('データなし',ctx1.canvas.width/2,ctx1.canvas.height/2);
+  }
+
+  // Bar chart
+  const days=[],amts=[];
+  for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);const ds=d.toISOString().slice(0,10);days.push((d.getMonth()+1)+'/'+(d.getDate()));amts.push(D.transactions.filter(t=>t.date===ds).reduce((s,t)=>s+t.total,0));}
+  if(barC){barC.destroy();barC=null;}
+  const ctx2=document.getElementById('bar-chart').getContext('2d');
+  barC=new Chart(ctx2,{
+    type:'bar',
+    data:{labels:days,datasets:[{data:amts,backgroundColor:'rgba(129,140,248,.6)',borderRadius:6,borderSkipped:false}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{callback:v=>'¥'+v.toLocaleString(),font:{size:10},color:'#8892B0'},grid:{color:'rgba(0,0,0,.04)'}},x:{ticks:{font:{size:11},color:'#8892B0'},grid:{display:false}}}}
+  });
+
+  // TX list
+  const el=document.getElementById('tx-list');
+  const recent=[...D.transactions].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,12);
+  if(!recent.length){
+    el.innerHTML='<div class="empty"><div class="empty-ico">🧾</div><p>まだ記録がありません<br>＋ ボタンで追加しましょう</p></div>';
+    return;
+  }
+  el.innerHTML=recent.map(tx=>{
+    const mc=tx.items.reduce((m,i)=>{const sa=tx.items.filter(x=>x.cat===i.cat).reduce((a,x)=>a+x.amt,0);const ma=tx.items.filter(x=>x.cat===m).reduce((a,x)=>a+x.amt,0);return sa>ma?i.cat:m;},tx.items[0]?.cat||'other');
+    const cat=CATS[mc]||CATS.other;
+    return `<div class="tx">
+      <div class="tx-ico" style="background:${cat.hex};border-radius:2px;"></div>
+      <div class="tx-body">
+        <div class="tx-store">${tx.store}</div>
+        <div class="tx-meta">${cat.n} · ${tx.items.length} 品目</div>
+      </div>
+      <div class="tx-right">
+        <div class="tx-amt">¥${tx.total.toLocaleString()}</div>
+        <div class="tx-date">${tx.date}</div>
+        <div class="tx-actions">
+          <button class="tx-edit-btn" onclick="editTx('${tx.id}')">編集</button>
+          <button class="tx-del-btn" onclick="deleteTx('${tx.id}')">削除</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ─── CAMERA ───
+let camStream=null;
+async function openCamera() {
+  navigate('camera');
+  document.getElementById('api-notice').textContent=getApiKey()?'🤖 AI 解析 ON':'📋 サンプルデータ';
+  try {
+    camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1280}}});
+    document.getElementById('cam-v').srcObject=camStream;
+  } catch(e){ toast('カメラが使えません。🖼️ からギャラリーを選択してください'); }
+}
+function closeCamera(){stopCam();navigate('home');}
+function stopCam(){if(camStream){camStream.getTracks().forEach(t=>t.stop());camStream=null;}}
+function snap(){
+  const v=document.getElementById('cam-v'),c=document.getElementById('cam-c');
+  c.width=v.videoWidth||640;c.height=v.videoHeight||480;
+  c.getContext('2d').drawImage(v,0,0);
+  stopCam();analyzeReceipt(c.toDataURL('image/jpeg',.85));
+}
+function pickGallery(){document.getElementById('gallery').click();}
+function onGallery(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>analyzeReceipt(ev.target.result);r.readAsDataURL(f);e.target.value='';}
+
+// ─── AI API (Gemini / Claude 自動判別) ───
+async function toJpegBase64(imgData){
+  return new Promise(resolve=>{
+    const img=new Image();
+    img.onload=()=>{
+      const c=document.createElement('canvas');
+      const max=1280;
+      let w=img.width,h=img.height;
+      if(w>max||h>max){if(w>h){h=Math.round(h*max/w);w=max;}else{w=Math.round(w*max/h);h=max;}}
+      c.width=w;c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      resolve(c.toDataURL('image/jpeg',0.85).split(',')[1]);
+    };
+    img.src=imgData;
+  });
+}
+
+async function callClaude(imgData, mime, prompt) {
+  const key=getApiKey();
+  // 画像をJPEGに変換
+  let b64=imgData;
+  if(imgData.startsWith('data:')){
+    b64=await toJpegBase64(imgData);
+  }
+
+  // キーの先頭で API を判別: AIza... → Gemini、sk-ant... → Claude
+  if(key.startsWith('sk-ant')){
+    return callAnthropic(b64, prompt, key);
+  } else {
+    return callGemini(b64, prompt, key);  // AIza も AQ. も Gemini 扱い
+  }
+}
+
+async function callGemini(b64, prompt, key){
+  const res=await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
+    {
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body:JSON.stringify({
+        contents:[{parts:[
+          {inline_data:{mime_type:'image/jpeg',data:b64}},
+          {text:prompt}
+        ]}],
+        generationConfig:{temperature:0.1,maxOutputTokens:1024}
+      })
+    }
+  );
+  if(!res.ok){
+    const errText=await res.text().catch(()=>'');
+    throw new Error('API Error: '+res.status+' '+errText);
+  }
+  const data=await res.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text||'';
+}
+
+async function callAnthropic(b64, prompt, key){
+  const res=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'x-api-key':key,'anthropic-version':'2023-06-01','content-type':'application/json','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:1024,messages:[{role:'user',content:[
+      {type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}},
+      {type:'text',text:prompt}
+    ]}]})
+  });
+  if(!res.ok){
+    const errText=await res.text().catch(()=>'');
+    throw new Error('API Error: '+res.status+' '+errText);
+  }
+  const data=await res.json();
+  return data.content?.[0]?.text||'';
+}
+function extractJson(text){const m=text.match(/\{[\s\S]*\}/);if(!m)throw new Error('JSON not found');return JSON.parse(m[0]);}
+
+// ─── ANALYZE ───
+const MOCK=[
+  {store:'イオン',items:[{name:'牛乳 1L×2',amt:396,cat:'food'},{name:'食パン',amt:148,cat:'food'},{name:'豚バラ肉 300g',amt:348,cat:'food'},{name:'洗濯洗剤',amt:498,cat:'goods'}]},
+  {store:'セブンイレブン',items:[{name:'おにぎり 鮭',amt:148,cat:'food'},{name:'カフェラテ',amt:165,cat:'food'},{name:'チョコ菓子',amt:198,cat:'luxury'}]},
+  {store:'マツモトキヨシ',items:[{name:'シャンプー',amt:698,cat:'goods'},{name:'歯ブラシ 3本組',amt:298,cat:'goods'},{name:'絆創膏',amt:248,cat:'goods'}]},
+  {store:'業務スーパー',items:[{name:'鶏むね肉 2kg',amt:780,cat:'food'},{name:'パスタ 500g×3',amt:398,cat:'food'},{name:'冷凍ブロッコリー',amt:228,cat:'food'}]},
+  {store:'ドン・キホーテ',items:[{name:'電池 単3 8本',amt:498,cat:'goods'},{name:'お菓子詰め合わせ',amt:1280,cat:'luxury'},{name:'カップ麺 12個',amt:1480,cat:'food'}]},
+];
+let pending={items:[],store:'',img:''};
+let editingId=null; // 編集中のトランザクションID（新規追加はnull）
+
+async function analyzeReceipt(imgData) {
+  pending={items:[],store:'',img:imgData};
+  editingId=null;
+  navigate('analyze');
+  document.getElementById('analyze-img').src=imgData;
+  document.getElementById('analyze-title').textContent=getApiKey()?'AI 解析中…':'サンプルデータで動作中';
+  document.getElementById('analyze-msg').textContent=getApiKey()
+    ?'Claude がレシートを読み取っています…\nしばらくお待ちください'
+    :'APIキー未設定のためサンプルデータを使用します';
+
+  if(getApiKey()){
+    try{
+      const text=await callClaude(imgData,'image/jpeg',
+        `このレシートから品目一覧を抽出してください。JSONのみ返してください。
+カテゴリ: food=食品・飲料, luxury=外食・デリ・贅沢品, goods=日用品・生活用品, transport=交通費, leisure=レジャー, hobby=趣味, other=その他
+{"store":"お店名","items":[{"name":"商品名","amt":金額数値,"cat":"カテゴリ"}]}`
+      );
+      const parsed=extractJson(text);
+      pending.store=parsed.store||'不明なお店';
+      pending.items=(parsed.items||[]).map(i=>({name:i.name||'',amt:parseInt(i.amt)||0,cat:CATS[i.cat]?i.cat:guessCat(i.name||'')}));
+    }catch(err){
+      console.error(err);toast('⚠️ API エラー。サンプルデータを使用します。');useMock();
+    }
+  }else{
+    await new Promise(r=>setTimeout(r,1600));useMock();
+  }
+  showConfirm();
+}
+function useMock(){const m=MOCK[Math.floor(Math.random()*MOCK.length)];pending.store=m.store;pending.items=m.items.map(i=>({...i}));}
+
+// ─── 記録の編集 ───
+function editTx(id) {
+  const tx=D.transactions.find(t=>String(t.id)===String(id));
+  if(!tx) return;
+  editingId=id;
+  pending.store=tx.store;
+  pending.img='';
+  pending.items=tx.items.map(i=>({...i}));
+  document.getElementById('cf-title').textContent='記録を編集';
+  document.getElementById('cf-save-btn').textContent='✏️ 更新する';
+  document.getElementById('cf-store').value=tx.store;
+  document.getElementById('cf-date').value=tx.date;
+  navigate('confirm');
+  renderItems();
+}
+
+function deleteTx(id) {
+  if(!confirm('この記録を削除しますか？')) return;
+  D.transactions=D.transactions.filter(t=>String(t.id)!==String(id));
+  save();renderHome();toast('削除しました');
+}
+
+// ─── CONFIRM ───
+function showConfirm(){
+  editingId=null;
+  document.getElementById('cf-title').textContent='内容を確認';
+  document.getElementById('cf-save-btn').textContent='💾 保存する';
+  document.getElementById('cf-store').value=pending.store;
+  document.getElementById('cf-date').value=new Date().toISOString().slice(0,10);
+  navigate('confirm');renderItems();
+}
+function renderItems(){
+  const el=document.getElementById('items-list');
+  if(!pending.items.length){el.innerHTML='<p style="color:var(--muted);text-align:center;padding:12px;font-size:14px;">品目がありません</p>';calcTotal();return;}
+  el.innerHTML=pending.items.map((item,i)=>`
+    <div class="item-row">
+      <div class="item-left">
+        <input type="text" class="fi" value="${item.name}" placeholder="商品名" oninput="pending.items[${i}].name=this.value">
+        <select class="fi" onchange="pending.items[${i}].cat=this.value">${catOpts(item.cat)}</select>
+      </div>
+      <div class="item-right">
+        <div style="display:flex;align-items:center;gap:3px;">
+          <span style="color:var(--muted);font-size:13px;">¥</span>
+          <input type="number" class="amt-fi" value="${item.amt}" oninput="pending.items[${i}].amt=parseInt(this.value)||0;calcTotal()">
+        </div>
+        <button class="del-btn" onclick="removeItem(${i})">✕</button>
+      </div>
+    </div>`).join('');
+  calcTotal();
+}
+function calcTotal(){const t=pending.items.reduce((s,i)=>s+(i.amt||0),0);document.getElementById('cf-total').textContent='¥'+t.toLocaleString();}
+function addItem(){pending.items.push({name:'',amt:0,cat:'food'});renderItems();}
+function removeItem(i){pending.items.splice(i,1);renderItems();}
+
+function saveTx(){
+  const store=document.getElementById('cf-store').value.trim();
+  const date=document.getElementById('cf-date').value;
+  if(!store){toast('お店名を入力してください');return;}
+  if(!pending.items.length){toast('品目がありません');return;}
+  const total=pending.items.reduce((s,i)=>s+(i.amt||0),0);
+
+  if(editingId){
+    // 編集モード：既存レコードを更新
+    const idx=D.transactions.findIndex(t=>String(t.id)===String(editingId));
+    if(idx>=0) D.transactions[idx]={...D.transactions[idx],date,store,items:[...pending.items],total};
+    toast('✅ 更新しました');
+  } else {
+    // 新規追加
+    D.transactions.push({id:Date.now(),date,store,items:[...pending.items],total});
+    toast('✅ 保存しました');
+  }
+  editingId=null;
+  save();navigate('home');
+}
+
+function cancelConfirm(){
+  editingId=null;navigate('home');
+}
+
+// ─── MANUAL ───
+function openManual(){stopCam();document.getElementById('manual-modal').classList.add('open');}
+function closeManualModal(){document.getElementById('manual-modal').classList.remove('open');}
+function startManual(){
+  const store=document.getElementById('mm-store').value.trim()||'（未入力）';
+  pending={items:[{name:'',amt:0,cat:'food'}],store,img:''};
+  editingId=null;
+  closeManualModal();
+  document.getElementById('cf-title').textContent='内容を確認';
+  document.getElementById('cf-save-btn').textContent='💾 保存する';
+  document.getElementById('cf-store').value=store;
+  document.getElementById('cf-date').value=new Date().toISOString().slice(0,10);
+  navigate('confirm');renderItems();
+}
+
+// ─── PRICE COMPARISON ───
+function renderPrices(){
+  const q=(document.getElementById('price-q')?.value||'').toLowerCase();
+  const el=document.getElementById('price-list');
+  const db={};
+  D.transactions.forEach(tx=>tx.items.forEach(item=>{
+    if(!db[item.name]) db[item.name]={};
+    if(!db[item.name][tx.store]) db[item.name][tx.store]=[];
+    db[item.name][tx.store].push(item.amt);
+  }));
+  const activeCoupons=D.coupons.filter(c=>!c.exp||new Date(c.exp)>=new Date());
+  let entries=Object.entries(db);
+  if(q) entries=entries.filter(([k])=>k.toLowerCase().includes(q));
+  if(!entries.length){
+    el.innerHTML=D.transactions.length===0
+      ?'<div class="empty"><div class="empty-ico">🏪</div><p>レシートを登録すると<br>お店ごとの価格比較ができます</p></div>'
+      :`<div class="empty"><div class="empty-ico">🔍</div><p>「${q}」が見つかりませんでした</p></div>`;
+    return;
+  }
+  el.innerHTML=entries.map(([name,stores])=>{
+    const rows=Object.entries(stores).map(([store,prices])=>({store,avg:Math.round(prices.reduce((a,b)=>a+b,0)/prices.length),cnt:prices.length})).sort((a,b)=>a.avg-b.avg);
+    const best=rows[0].store;
+    const rc=activeCoupons.filter(c=>rows.some(r=>r.store.includes(c.store)||c.store.includes(r.store)));
+    return `<div class="price-product">
+      <div class="price-name">${name}</div>
+      <div class="price-rows">${rows.map(r=>`<div class="price-row${r.store===best?' best':''}"><span class="price-store">${r.store===best?'🏆 ':''}${r.store}<span style="opacity:.45;font-size:11px;"> ×${r.cnt}</span></span><span class="price-amt">¥${r.avg.toLocaleString()}</span></div>`).join('')}</div>
+      ${rc.length?`<div class="coupon-tag">🎫 クーポン：${rc.map(c=>c.store+' '+c.disc).join(' / ')}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+// ─── COUPONS ───
+function renderCoupons(){
+  const el=document.getElementById('coupon-list');
+  const now=new Date();
+  if(!D.coupons.length){el.innerHTML='<div class="empty"><div class="empty-ico">✂️</div><p>クーポンがありません<br>下のボタンから追加できます</p></div>';return;}
+  el.innerHTML=D.coupons.map((c,i)=>{
+    const exp=c.exp&&new Date(c.exp)<now;
+    return `<div class="coupon"${exp?' style="opacity:.45;"':''}>
+      <div class="coupon-icon">🎫</div>
+      <div class="coupon-body">
+        <div class="coupon-store">${c.store}</div>
+        ${c.note?`<div class="coupon-note">${c.note}</div>`:''}
+        <div class="coupon-exp">${exp?'⚠️ 期限切れ · ':c.exp?'期限: '+c.exp:'期限なし'}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+        <div class="coupon-badge">${c.disc}</div>
+        <button onclick="delCoupon(${i})" style="font-size:11px;color:var(--danger);background:none;border:none;cursor:pointer;font-weight:600;">削除</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function openCouponModal(){
+  ['cm-store','cm-disc','cm-exp','cm-note'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('coupon-loading').style.display='none';
+  document.getElementById('coup-modal').classList.add('open');
+}
+function closeCouponModal(){document.getElementById('coup-modal').classList.remove('open');}
+async function onCouponImage(e){
+  const f=e.target.files[0];if(!f)return;e.target.value='';
+  if(!getApiKey()){toast('APIキーを設定すると画像から自動読み取りできます');return;}
+  document.getElementById('coupon-loading').style.display='block';
+  const reader=new FileReader();
+  reader.onload=async(ev)=>{
+    const imgData=ev.target.result;
+    try{
+      const text=await callClaude(imgData,'image/jpeg',
+        `このクーポン・チラシ画像から割引情報を抽出してください。JSONのみ返してください。
+{"store":"お店名","disc":"割引内容（例:10%OFF、¥500引）","exp":"有効期限YYYY-MM-DD形式（不明ならnull）","note":"対象商品や利用条件など"}`
+      );
+      const parsed=extractJson(text);
+      if(parsed.store)  document.getElementById('cm-store').value=parsed.store;
+      if(parsed.disc)   document.getElementById('cm-disc').value=parsed.disc;
+      if(parsed.exp&&parsed.exp!=='null')  document.getElementById('cm-exp').value=parsed.exp;
+      if(parsed.note&&parsed.note!=='null') document.getElementById('cm-note').value=parsed.note;
+      toast('✅ クーポン情報を読み取りました');
+    }catch(err){
+      console.error(err);toast('⚠️ 読み取りに失敗しました。手動で入力してください。');
+    } finally {
+      document.getElementById('coupon-loading').style.display='none';
+    }
+  };
+  reader.readAsDataURL(f);
+}
+function saveCoupon(){
+  const store=document.getElementById('cm-store').value.trim();
+  const disc=document.getElementById('cm-disc').value.trim();
+  const exp=document.getElementById('cm-exp').value;
+  const note=document.getElementById('cm-note').value.trim();
+  if(!store||!disc){toast('お店名と割引内容は必須です');return;}
+  D.coupons.push({store,disc,exp,note,id:Date.now()});
+  save();closeCouponModal();renderCoupons();toast('✅ クーポンを追加しました');
+}
+function delCoupon(i){if(!confirm('このクーポンを削除しますか？'))return;D.coupons.splice(i,1);save();renderCoupons();}
+
+// ─── SETTINGS ───
+function renderSettings(){
+  document.getElementById('s-budget').value=D.settings.budget||'';
+  document.getElementById('s-food').value=D.settings.foodBudget||'';
+  document.getElementById('s-goods').value=D.settings.goodsBudget||'';
+  document.getElementById('s-apikey').value=D.apiKey?'••••••••••••••••':'';
+}
+function saveSettings(){
+  D.settings.budget=parseInt(document.getElementById('s-budget').value)||100000;
+  D.settings.foodBudget=parseInt(document.getElementById('s-food').value)||0;
+  D.settings.goodsBudget=parseInt(document.getElementById('s-goods').value)||0;
+  save();toast('✅ 設定を保存しました');
+}
+function saveApiKey(){
+  const v=document.getElementById('s-apikey').value.trim();
+  if(v&&!v.startsWith('••')) D.apiKey=v;
+  save();toast(D.apiKey?'✅ APIキーを保存しました':'APIキーを削除しました');
+}
+function exportData(){
+  const blob=new Blob([JSON.stringify(D,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='kakeibo_'+new Date().toISOString().slice(0,10)+'.json';a.click();URL.revokeObjectURL(url);
+}
+function clearAll(){
+  if(!confirm('すべてのデータを削除します。元に戻せません。'))return;
+  D={transactions:[],coupons:[],settings:{budget:100000},apiKey:'',readNotifIds:[]};
+  save();navigate('home');toast('データを削除しました');
+}
+
+// ─── TOAST ───
+function toast(msg){
+  document.querySelector('.toast')?.remove();
+  const el=document.createElement('div');el.className='toast';el.textContent=msg;
+  document.body.appendChild(el);setTimeout(()=>el.remove(),2700);
+}
+
+// ─── INIT ───
+load();
+renderHome();
+updateBellBadge();
+</script>
+</body>
+</html>
