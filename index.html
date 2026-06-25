@@ -460,7 +460,7 @@ textarea.finput { resize: vertical; min-height: 80px; line-height: 1.6; }
 <script>
 // ═══════════════════════════════════════════════
 // ▼▼▼ APIキーをここに書くと設定不要になります ▼▼▼
-const DEFAULT_API_KEY = '';
+const DEFAULT_API_KEY = 'AQ.Ab8RN6J7MzFxfQBx8b0kIDKdjKTMtln7WgE0Hk_3mAeLOVlysw';
 // ▲▲▲ 例: const DEFAULT_API_KEY = 'sk-ant-api03-xxxxx...'; ▲▲▲
 // ═══════════════════════════════════════════════
 
@@ -772,7 +772,14 @@ async function analyzeReceipt(imgData) {
       pending.store=parsed.store||'不明なお店';
       pending.items=(parsed.items||[]).map(i=>({name:i.name||'',amt:parseInt(i.amt)||0,cat:CATS[i.cat]?i.cat:guessCat(i.name||'')}));
     }catch(err){
-      console.error(err);toast('⚠️ API エラー。サンプルデータを使用します。');useMock();
+      console.error(err);
+      if(err.message==='JSON not found'){
+        toast('⚠️ レシートを読み取れませんでした。レシートの画像を使ってください。');
+        navigate('home');
+      } else {
+        toast('⚠️ API エラー。サンプルデータを使用します。');useMock();showConfirm();
+      }
+      return;
     }
   }else{
     await new Promise(r=>setTimeout(r,1600));useMock();
