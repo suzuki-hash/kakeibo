@@ -403,6 +403,7 @@ textarea.finput { resize: vertical; min-height: 80px; line-height: 1.6; }
   </div>
   <div style="margin:0 16px 24px;display:flex;flex-direction:column;gap:10px;">
     <button class="btn btn-success" id="cf-save-btn" onclick="saveTx()">保存する</button>
+    <button class="btn btn-accent" id="cf-save-next-btn" onclick="window._nextReceipt=true;saveTx()" style="background:rgba(77,95,232,.12);color:var(--accent);border:1px solid rgba(77,95,232,.2);">保存して次のレシートへ</button>
     <button class="btn btn-ghost" onclick="cancelConfirm()">キャンセル</button>
   </div>
 </div>
@@ -841,6 +842,8 @@ function editTx(id) {
   updateTaxUI();
   document.getElementById('cf-title').textContent='記録を編集';
   document.getElementById('cf-save-btn').textContent='✏️ 更新する';
+  const nextBtn=document.getElementById('cf-save-next-btn');
+  if(nextBtn) nextBtn.style.display='none';
   document.getElementById('cf-store').value=tx.store;
   document.getElementById('cf-date').value=tx.date;
   navigate('confirm');
@@ -858,6 +861,9 @@ function showConfirm(){
   editingId=null;
   pending.taxMode='incl';
   updateTaxUI();
+  window._nextReceipt=false;
+  const nextBtn=document.getElementById('cf-save-next-btn');
+  if(nextBtn) nextBtn.style.display='';
   document.getElementById('cf-title').textContent='内容を確認';
   document.getElementById('cf-save-btn').textContent='💾 保存する';
   document.getElementById('cf-store').value=pending.store;
@@ -933,6 +939,15 @@ function saveTx(){
     // 新規追加
     D.transactions.push({id:Date.now(),date,store,items,total});
     toast('✅ 保存しました');
+    editingId=null;
+    save();
+    if(window._nextReceipt){
+      window._nextReceipt=false;
+      openCamera();
+    } else {
+      navigate('home');
+    }
+    return;
   }
   editingId=null;
   save();navigate('home');
